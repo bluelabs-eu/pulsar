@@ -25,14 +25,18 @@ import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.Data;
 import org.apache.pulsar.functions.api.Record;
 import org.apache.pulsar.io.core.PushSource;
 import org.apache.pulsar.io.core.SourceContext;
 import org.apache.pulsar.io.core.annotations.Connector;
 import org.apache.pulsar.io.core.annotations.IOType;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,10 +56,23 @@ public class RabbitMQSource extends PushSource<byte[]> {
     private Channel rabbitMQChannel;
     private RabbitMQSourceConfig rabbitMQSourceConfig;
 
+    private String queueName;
+    private long startTime;
+
+    private Pattern routingKeyPattern;
+    private String keyGroup;
+    private String[] propertyGroups;
+
     @Override
     public void open(Map<String, Object> config, SourceContext sourceContext) throws Exception {
         rabbitMQSourceConfig = RabbitMQSourceConfig.load(config);
         rabbitMQSourceConfig.validate();
+
+        if (rabbitMQSourceConfig.isParseRoutingKey()) {
+            routingKeyPattern = Pattern.compile(rabbitMQSourceConfig.getRoutingKeyPattern());
+            keyGroup = rabbitMQSourceConfig.getKeyGroupName();
+            propertyGroups = rabbitMQSourceConfig.getRoutingKeyGroups().split(",");
+        }
 
         ConnectionFactory connectionFactory = rabbitMQSourceConfig.createConnectionFactory();
         rabbitMQConnection = connectionFactory.newConnection(rabbitMQSourceConfig.getConnectionName());
@@ -64,19 +81,39 @@ public class RabbitMQSource extends PushSource<byte[]> {
                 rabbitMQConnection.getPort()
         );
         rabbitMQChannel = rabbitMQConnection.createChannel();
+        AMQP.Queue.DeclareOk declaration;
         if (rabbitMQSourceConfig.isPassive()) {
-            rabbitMQChannel.queueDeclarePassive(rabbitMQSourceConfig.getQueueName());
+            declaration = rabbitMQChannel.queueDeclarePassive(rabbitMQSourceConfig.getQueueName());
         } else {
-            rabbitMQChannel.queueDeclare(rabbitMQSourceConfig.getQueueName(), false, false, false, null);
+            declaration = rabbitMQChannel.queueDeclare(
+                    rabbitMQSourceConfig.getQueueName(),
+                    rabbitMQSourceConfig.isDurable(),
+                    rabbitMQSourceConfig.isExclusive(),
+                    rabbitMQSourceConfig.isAutoDelete(),
+                    null);
         }
+        // Queue name can be generated on the rabbitmq side, so we need to check for it instead of assuming
+        // that the configured one is being used
+        queueName = declaration.getQueue();
+        startTime = System.currentTimeMillis();
+
         logger.info("Setting channel.basicQos({}, {}).",
                 rabbitMQSourceConfig.getPrefetchCount(),
                 rabbitMQSourceConfig.isPrefetchGlobal()
         );
         rabbitMQChannel.basicQos(rabbitMQSourceConfig.getPrefetchCount(), rabbitMQSourceConfig.isPrefetchGlobal());
         com.rabbitmq.client.Consumer consumer = new RabbitMQConsumer(this, rabbitMQChannel);
-        rabbitMQChannel.basicConsume(rabbitMQSourceConfig.getQueueName(), consumer);
-        logger.info("A consumer for queue {} has been successfully started.", rabbitMQSourceConfig.getQueueName());
+
+        if (!rabbitMQSourceConfig.getExchange().isEmpty()) {
+            String[] routingKeys = rabbitMQSourceConfig.getRoutingKeys().split(",");
+            String exchange = rabbitMQSourceConfig.getExchange();
+            for (String routingKey : routingKeys) {
+                rabbitMQChannel.queueBind(rabbitMQSourceConfig.getQueueName(), exchange, routingKey);
+            }
+        }
+
+        rabbitMQChannel.basicConsume(queueName, consumer);
+        logger.info("A consumer for queue {} has been successfully started.", queueName);
     }
 
     @Override
@@ -96,11 +133,39 @@ public class RabbitMQSource extends PushSource<byte[]> {
         @Override
         public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body)
                 throws IOException {
-            source.consume(new RabbitMQRecord(Optional.ofNullable(envelope.getRoutingKey()), body));
+
+            source.consume(toMessage(envelope, properties, body));
             long deliveryTag = envelope.getDeliveryTag();
             // positively acknowledge all deliveries up to this delivery tag to reduce network traffic
             // since manual message acknowledgments are turned on by default
             this.getChannel().basicAck(deliveryTag, true);
+        }
+
+        @NotNull
+        private RabbitMQRecord toMessage(Envelope envelope, AMQP.BasicProperties properties, byte[] body) {
+            HashMap<String, String> pulsarProperties = new HashMap<>();
+            Optional<String> routingKey = Optional.ofNullable(envelope.getRoutingKey());
+
+            for (Map.Entry<String, Object> property : properties.getHeaders().entrySet()) {
+                pulsarProperties.put(property.getKey(), property.getValue().toString());
+            }
+
+            if (rabbitMQSourceConfig.isParseRoutingKey()) {
+                Matcher matcher = routingKeyPattern.matcher(envelope.getRoutingKey());
+
+                if (matcher.find()) {
+                    routingKey = Optional.ofNullable(matcher.group(rabbitMQSourceConfig.getKeyGroupName()));
+
+                    for (String group : propertyGroups) {
+                        String match = matcher.group(group);
+                        if (match != null) {
+                            pulsarProperties.put(group, match);
+                        }
+                    }
+                }
+            }
+
+            return new RabbitMQRecord(routingKey, body, pulsarProperties);
         }
     }
 
@@ -108,5 +173,6 @@ public class RabbitMQSource extends PushSource<byte[]> {
     private static class RabbitMQRecord implements Record<byte[]> {
         private final Optional<String> key;
         private final byte[] value;
+        private final Map<String, String> properties;
     }
 }

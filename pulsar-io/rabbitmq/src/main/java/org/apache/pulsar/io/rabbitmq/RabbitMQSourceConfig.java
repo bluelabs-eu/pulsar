@@ -25,6 +25,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
@@ -57,9 +59,75 @@ public class RabbitMQSourceConfig extends RabbitMQAbstractConfig implements Seri
 
     @FieldDoc(
             required = false,
+            defaultValue = "",
+            help = "Comma separated routing keys for the topic filtering"
+    )
+    private String routingKeys = "";
+
+    @FieldDoc(
+            required = false,
+            defaultValue = "",
+            help = "Exchange to bind the queue to"
+    )
+    private String exchange = "";
+
+    @FieldDoc(
+            required = false,
             defaultValue = "false",
             help = "Set true if the queue should be declared passively - ie to preserve durability/timeout settings")
     private boolean passive = false;
+
+    @FieldDoc(
+            required = false,
+            defaultValue = "false",
+            help = "Set true if the queue should be durable")
+    private boolean durable = false;
+
+    @FieldDoc(
+            required = false,
+            defaultValue = "false",
+            help = "Set true if the queue should be exclusive")
+    private boolean exclusive = false;
+
+    @FieldDoc(
+            required = false,
+            defaultValue = "false",
+            help = "Set true if the queue should be auto deleted")
+    private boolean autoDelete = false;
+
+
+    @FieldDoc(
+            required = false,
+            defaultValue = "false",
+            help = "Set true if routing key should be parsed to produce properties and routing key"
+    )
+    private boolean parseRoutingKey = false;
+
+    @FieldDoc(
+            required = false,
+            defaultValue = "",
+            help = "Regex pattern to extract values from the RabbitMQ routing key to message properties and routing key"
+    )
+    private String routingKeyPattern = "";
+
+    @FieldDoc(
+            required = false,
+            defaultValue = "routingKey",
+            help = "Named group of the regex pattern to be used as a routing key"
+    )
+    private String keyGroupName = "routingKey";
+
+    /**
+     * Ideally this would be extracted directly from the routingKeyPattern, yet api to get the regex matching groups
+     * is not available until JDK v20.
+     */
+    @FieldDoc(
+            required = false,
+            defaultValue = "",
+            help = "Comma separated list of groups in the routingKeyPattern that should be included in the properties"
+    )
+    private String routingKeyGroups = "";
+
 
     public static RabbitMQSourceConfig load(String yamlFile) throws IOException {
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
@@ -76,5 +144,20 @@ public class RabbitMQSourceConfig extends RabbitMQAbstractConfig implements Seri
         super.validate();
         Preconditions.checkNotNull(queueName, "queueName property not set.");
         Preconditions.checkArgument(prefetchCount >= 0, "prefetchCount must be non-negative.");
+
+        if (!routingKeyPattern.isEmpty()) {
+            try {
+                Pattern.compile(routingKeyPattern);
+            } catch (PatternSyntaxException exception) {
+                throw new IllegalArgumentException("Regex pattern is not valid: " + routingKeyPattern, exception);
+            }
+        }
+
+        if (!exchange.isEmpty()) {
+            Preconditions.checkArgument(
+                    routingKeys.split(",").length > 0,
+                    "routing keys must be provided together with the exchange"
+            );
+        }
     }
 }

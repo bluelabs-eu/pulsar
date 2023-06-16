@@ -21,6 +21,8 @@ package org.apache.pulsar.io.rabbitmq;
 import com.google.common.base.Preconditions;
 import com.rabbitmq.client.ConnectionFactory;
 import java.io.Serializable;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
 import lombok.Data;
 import lombok.experimental.Accessors;
 import org.apache.pulsar.io.core.annotations.FieldDoc;
@@ -108,6 +110,12 @@ public class RabbitMQAbstractConfig implements Serializable {
         help = "The requested heartbeat timeout in seconds")
     private int requestedHeartbeat = 60;
 
+    @FieldDoc(
+            required = false,
+            defaultValue = "",
+            help = "SSL protocol to use")
+    private String sslProtocol = "";
+
     public void validate() {
         Preconditions.checkNotNull(host, "host property not set.");
         Preconditions.checkNotNull(port, "port property not set.");
@@ -115,7 +123,7 @@ public class RabbitMQAbstractConfig implements Serializable {
         Preconditions.checkNotNull(connectionName, "connectionName property not set.");
     }
 
-    public ConnectionFactory createConnectionFactory() {
+    public ConnectionFactory createConnectionFactory() throws NoSuchAlgorithmException, KeyManagementException {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost(this.host);
         connectionFactory.setUsername(this.username);
@@ -127,6 +135,12 @@ public class RabbitMQAbstractConfig implements Serializable {
         connectionFactory.setHandshakeTimeout(this.handshakeTimeout);
         connectionFactory.setRequestedHeartbeat(this.requestedHeartbeat);
         connectionFactory.setPort(this.port);
+
+
+        if (!this.sslProtocol.equals("")) {
+            connectionFactory.useSslProtocol(this.sslProtocol);
+        }
+
         return connectionFactory;
     }
 }
