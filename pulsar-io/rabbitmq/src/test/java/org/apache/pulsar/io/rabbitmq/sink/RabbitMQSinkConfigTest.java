@@ -70,6 +70,7 @@ public class RabbitMQSinkConfigTest {
         map.put("requestedHeartbeat", "60");
         map.put("exchangeName", "test-exchange");
         map.put("exchangeType", "test-exchange-type");
+        map.put("sslProtocol", "TLS");
 
         RabbitMQSinkConfig config = RabbitMQSinkConfig.load(map);
         assertNotNull(config);
@@ -86,6 +87,7 @@ public class RabbitMQSinkConfigTest {
         assertEquals(config.getRequestedHeartbeat(), Integer.parseInt("60"));
         assertEquals(config.getExchangeName(), "test-exchange");
         assertEquals(config.getExchangeType(), "test-exchange-type");
+        assertEquals(config.getSslProtocol(), "TLS");
     }
 
     @Test
@@ -104,6 +106,7 @@ public class RabbitMQSinkConfigTest {
         map.put("requestedHeartbeat", "60");
         map.put("exchangeName", "test-exchange");
         map.put("exchangeType", "test-exchange-type");
+        map.put("sslProtocol", "TLS");
 
         RabbitMQSinkConfig config = RabbitMQSinkConfig.load(map);
         config.validate();

@@ -29,6 +29,7 @@ import java.util.Map;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.AssertJUnit.assertTrue;
 
 /**
  * RabbitMQSourceConfig test
@@ -75,6 +76,17 @@ public class RabbitMQSourceConfigTest {
         map.put("prefetchCount", "0");
         map.put("prefetchGlobal", "false");
         map.put("passive", "true");
+        map.put("sslProtocol", "TLS");
+        map.put("routingKeys", "routing-keys");
+        map.put("exchange", "exchange");
+        map.put("durable", "true");
+        map.put("exclusive", "true");
+        map.put("autoDelete", "true");
+        map.put("parseRoutingKey", "true");
+        map.put("routingKeyPattern", "pattern");
+        map.put("keyGroupName", "routingKeyName");
+        map.put("routingKeyGroups", "groups");
+        map.put("includeStartupTimeInProperties", true);
 
         RabbitMQSourceConfig config = RabbitMQSourceConfig.load(map);
         assertNotNull(config);
@@ -91,9 +103,19 @@ public class RabbitMQSourceConfigTest {
         assertEquals(Integer.parseInt("10000"), config.getHandshakeTimeout());
         assertEquals(Integer.parseInt("60"), config.getRequestedHeartbeat());
         assertEquals(Integer.parseInt("0"), config.getPrefetchCount());
-        assertEquals(false, config.isPrefetchGlobal());
-        assertEquals(false, config.isPrefetchGlobal());
-        assertEquals(true, config.isPassive());
+        assertFalse(config.isPrefetchGlobal());
+        assertTrue(config.isPassive());
+        assertEquals("TLS", config.getSslProtocol());
+        assertEquals("routing-keys", config.getRoutingKeys());
+        assertEquals("exchange", config.getExchange());
+        assertTrue(config.isDurable());
+        assertTrue(config.isExclusive());
+        assertTrue(config.isAutoDelete());
+        assertTrue(config.isParseRoutingKey());
+        assertTrue(config.isIncludeStartupTimeInProperties());
+        assertEquals("pattern", config.getRoutingKeyPattern());
+        assertEquals("routingKeyName", config.getKeyGroupName());
+        assertEquals("groups", config.getRoutingKeyGroups());
     }
 
     @Test

@@ -129,6 +129,13 @@ public class RabbitMQSourceConfig extends RabbitMQAbstractConfig implements Seri
     private String routingKeyGroups = "";
 
 
+    @FieldDoc(
+            required = false,
+            defaultValue = "false",
+            help = "Include connector startup time to the message properties"
+    )
+    private boolean includeStartupTimeInProperties = false;
+
     public static RabbitMQSourceConfig load(String yamlFile) throws IOException {
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
         return mapper.readValue(new File(yamlFile), RabbitMQSourceConfig.class);

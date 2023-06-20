@@ -58,9 +58,7 @@ public class RabbitMQSource extends PushSource<byte[]> {
 
     private String queueName;
     private long startTime;
-
     private Pattern routingKeyPattern;
-    private String keyGroup;
     private String[] propertyGroups;
 
     @Override
@@ -70,7 +68,6 @@ public class RabbitMQSource extends PushSource<byte[]> {
 
         if (rabbitMQSourceConfig.isParseRoutingKey()) {
             routingKeyPattern = Pattern.compile(rabbitMQSourceConfig.getRoutingKeyPattern());
-            keyGroup = rabbitMQSourceConfig.getKeyGroupName();
             propertyGroups = rabbitMQSourceConfig.getRoutingKeyGroups().split(",");
         }
 
@@ -163,6 +160,10 @@ public class RabbitMQSource extends PushSource<byte[]> {
                         }
                     }
                 }
+            }
+
+            if (rabbitMQSourceConfig.isIncludeStartupTimeInProperties()) {
+                pulsarProperties.put("startupTime", Long.toString(startTime));
             }
 
             return new RabbitMQRecord(routingKey, body, pulsarProperties);
