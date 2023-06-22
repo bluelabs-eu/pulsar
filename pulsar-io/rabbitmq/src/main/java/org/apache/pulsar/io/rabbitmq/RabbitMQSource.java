@@ -146,7 +146,6 @@ public class RabbitMQSource extends PushSource<byte[]> {
             for (Map.Entry<String, Object> property : properties.getHeaders().entrySet()) {
                 pulsarProperties.put(property.getKey(), property.getValue().toString());
             }
-
             if (rabbitMQSourceConfig.isParseRoutingKey()) {
                 Matcher matcher = routingKeyPattern.matcher(envelope.getRoutingKey());
 
@@ -164,6 +163,10 @@ public class RabbitMQSource extends PushSource<byte[]> {
 
             if (rabbitMQSourceConfig.isIncludeStartupTimeInProperties()) {
                 pulsarProperties.put("startupTime", Long.toString(startTime));
+            }
+
+            if (rabbitMQSourceConfig.isIncludeQueueNameInProperties()) {
+                pulsarProperties.put("amqpQueueName", queueName);
             }
 
             return new RabbitMQRecord(routingKey, body, pulsarProperties);

@@ -136,6 +136,13 @@ public class RabbitMQSourceConfig extends RabbitMQAbstractConfig implements Seri
     )
     private boolean includeStartupTimeInProperties = false;
 
+    @FieldDoc(
+            required = false,
+            defaultValue = "false",
+            help = "Include queue name to the message properties"
+    )
+    private boolean includeQueueNameInProperties = false;
+
     public static RabbitMQSourceConfig load(String yamlFile) throws IOException {
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
         return mapper.readValue(new File(yamlFile), RabbitMQSourceConfig.class);
