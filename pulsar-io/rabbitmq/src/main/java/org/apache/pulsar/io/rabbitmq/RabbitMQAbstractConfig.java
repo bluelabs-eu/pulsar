@@ -136,7 +136,6 @@ public class RabbitMQAbstractConfig implements Serializable {
         connectionFactory.setRequestedHeartbeat(this.requestedHeartbeat);
         connectionFactory.setPort(this.port);
 
-
         if (!this.sslProtocol.equals("")) {
             connectionFactory.useSslProtocol(this.sslProtocol);
         }

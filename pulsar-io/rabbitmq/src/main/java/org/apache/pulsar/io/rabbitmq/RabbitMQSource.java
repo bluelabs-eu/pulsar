@@ -18,16 +18,15 @@
  */
 package org.apache.pulsar.io.rabbitmq;
 
-import com.rabbitmq.client.AMQP;
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.DefaultConsumer;
-import com.rabbitmq.client.Envelope;
+import com.rabbitmq.client.*;
+import com.rabbitmq.client.impl.recovery.AutorecoveringChannel;
+import com.rabbitmq.client.impl.recovery.AutorecoveringConnection;
+import com.rabbitmq.client.impl.recovery.QueueRecoveryListener;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.Data;
@@ -53,13 +52,16 @@ public class RabbitMQSource extends PushSource<byte[]> {
     private static Logger logger = LoggerFactory.getLogger(RabbitMQSource.class);
 
     private Connection rabbitMQConnection;
-    private Channel rabbitMQChannel;
+    private AutorecoveringChannel rabbitMQChannel;
     private RabbitMQSourceConfig rabbitMQSourceConfig;
 
-    private String queueName;
-    private long startTime;
+    private volatile String queueName;
     private Pattern routingKeyPattern;
     private String[] propertyGroups;
+
+    private volatile long queueRecoveryId = 0l;
+    private volatile long recoveryId = 0l;
+
 
     @Override
     public void open(Map<String, Object> config, SourceContext sourceContext) throws Exception {
@@ -72,12 +74,38 @@ public class RabbitMQSource extends PushSource<byte[]> {
         }
 
         ConnectionFactory connectionFactory = rabbitMQSourceConfig.createConnectionFactory();
-        rabbitMQConnection = connectionFactory.newConnection(rabbitMQSourceConfig.getConnectionName());
+        AutorecoveringConnection arConnection = (AutorecoveringConnection)
+                connectionFactory.newConnection(rabbitMQSourceConfig.getConnectionName());
+
+        rabbitMQConnection = arConnection;
+
+        arConnection.addQueueRecoveryListener(new QueueRecoveryListener() {
+            @Override
+            public void queueRecovered(String oldName, String newName) {
+                queueName = newName;
+                queueRecoveryId = new Random().nextLong();
+            }
+        });
+
+
         logger.info("A new connection to {}:{} has been opened successfully.",
                 rabbitMQConnection.getAddress().getCanonicalHostName(),
                 rabbitMQConnection.getPort()
         );
-        rabbitMQChannel = rabbitMQConnection.createChannel();
+        rabbitMQChannel = (AutorecoveringChannel) rabbitMQConnection.createChannel();
+
+
+        rabbitMQChannel.addRecoveryListener(new RecoveryListener() {
+            @Override
+            public void handleRecovery(Recoverable recoverable) {
+                recoveryId = new Random().nextLong();
+            }
+
+            @Override
+            public void handleRecoveryStarted(Recoverable recoverable) {
+
+            }
+        });
         AMQP.Queue.DeclareOk declaration;
         if (rabbitMQSourceConfig.isPassive()) {
             declaration = rabbitMQChannel.queueDeclarePassive(rabbitMQSourceConfig.getQueueName());
@@ -92,7 +120,6 @@ public class RabbitMQSource extends PushSource<byte[]> {
         // Queue name can be generated on the rabbitmq side, so we need to check for it instead of assuming
         // that the configured one is being used
         queueName = declaration.getQueue();
-        startTime = System.currentTimeMillis();
 
         logger.info("Setting channel.basicQos({}, {}).",
                 rabbitMQSourceConfig.getPrefetchCount(),
@@ -131,6 +158,7 @@ public class RabbitMQSource extends PushSource<byte[]> {
         public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body)
                 throws IOException {
 
+
             source.consume(toMessage(envelope, properties, body));
             long deliveryTag = envelope.getDeliveryTag();
             // positively acknowledge all deliveries up to this delivery tag to reduce network traffic
@@ -161,13 +189,16 @@ public class RabbitMQSource extends PushSource<byte[]> {
                 }
             }
 
-            if (rabbitMQSourceConfig.isIncludeStartupTimeInProperties()) {
-                pulsarProperties.put("startupTime", Long.toString(startTime));
+            if (rabbitMQSourceConfig.isIncludeConsumerTagInProperties()) {
+                pulsarProperties.put("consumerTag", getConsumerTag());
             }
 
             if (rabbitMQSourceConfig.isIncludeQueueNameInProperties()) {
                 pulsarProperties.put("amqpQueueName", queueName);
             }
+
+            pulsarProperties.put("queueRecoveryId", Long.toString(queueRecoveryId));
+            pulsarProperties.put("recoveryId", Long.toString(recoveryId));
 
             return new RabbitMQRecord(routingKey, body, pulsarProperties);
         }

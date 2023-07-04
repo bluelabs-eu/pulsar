@@ -86,8 +86,8 @@ public class RabbitMQSourceConfigTest {
         map.put("routingKeyPattern", "pattern");
         map.put("keyGroupName", "routingKeyName");
         map.put("routingKeyGroups", "groups");
-        map.put("includeStartupTimeInProperties", true);
-        map.put("includeQueueNameInProperties", true);
+        map.put("includeConsumerTagInProperties", "true");
+        map.put("includeQueueNameInProperties", "true");
 
         RabbitMQSourceConfig config = RabbitMQSourceConfig.load(map);
         assertNotNull(config);
@@ -113,7 +113,7 @@ public class RabbitMQSourceConfigTest {
         assertTrue(config.isExclusive());
         assertTrue(config.isAutoDelete());
         assertTrue(config.isParseRoutingKey());
-        assertTrue(config.isIncludeStartupTimeInProperties());
+        assertTrue(config.isIncludeConsumerTagInProperties());
         assertTrue(config.isIncludeQueueNameInProperties());
         assertEquals("pattern", config.getRoutingKeyPattern());
         assertEquals("routingKeyName", config.getKeyGroupName());

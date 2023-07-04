@@ -132,9 +132,9 @@ public class RabbitMQSourceConfig extends RabbitMQAbstractConfig implements Seri
     @FieldDoc(
             required = false,
             defaultValue = "false",
-            help = "Include connector startup time to the message properties"
+            help = "Include consumer tag to the message properties"
     )
-    private boolean includeStartupTimeInProperties = false;
+    private boolean includeConsumerTagInProperties = false;
 
     @FieldDoc(
             required = false,
