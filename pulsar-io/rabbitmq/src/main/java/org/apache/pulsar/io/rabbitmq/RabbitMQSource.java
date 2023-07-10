@@ -163,7 +163,7 @@ public class RabbitMQSource extends PushSource<byte[]> {
             long deliveryTag = envelope.getDeliveryTag();
             // positively acknowledge all deliveries up to this delivery tag to reduce network traffic
             // since manual message acknowledgments are turned on by default
-            this.getChannel().basicAck(deliveryTag, true);
+            this.getChannel().basicAck(deliveryTag, false);
         }
 
         @NotNull
