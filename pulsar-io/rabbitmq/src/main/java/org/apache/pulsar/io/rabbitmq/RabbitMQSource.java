@@ -68,7 +68,12 @@ public class RabbitMQSource extends PushSource<byte[]> {
         if (rabbitMQSourceConfig.isPassive()) {
             rabbitMQChannel.queueDeclarePassive(rabbitMQSourceConfig.getQueueName());
         } else {
-            rabbitMQChannel.queueDeclare(rabbitMQSourceConfig.getQueueName(), false, false, false, null);
+            rabbitMQChannel.queueDeclare(rabbitMQSourceConfig.getQueueName(),
+                                     rabbitMQSourceConfig.isDurable(),
+                                     rabbitMQSourceConfig.isExclusive(),
+                                     rabbitMQSourceConfig.isAutoDelete(),
+                                     null
+            );
         }
         logger.info("Setting channel.basicQos({}, {}).",
                 rabbitMQSourceConfig.getPrefetchCount(),
