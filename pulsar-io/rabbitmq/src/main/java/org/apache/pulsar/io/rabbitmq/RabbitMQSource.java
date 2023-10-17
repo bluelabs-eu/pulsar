@@ -65,14 +65,15 @@ public class RabbitMQSource extends PushSource<byte[]> {
                 rabbitMQConnection.getPort()
         );
         rabbitMQChannel = rabbitMQConnection.createChannel();
+        AMQP.Queue.DeclareOk queueDeclaration;
         if (rabbitMQSourceConfig.isPassive()) {
-            rabbitMQChannel.queueDeclarePassive(rabbitMQSourceConfig.getQueueName());
+            queueDeclaration = rabbitMQChannel.queueDeclarePassive(rabbitMQSourceConfig.getQueueName());
         } else {
-            rabbitMQChannel.queueDeclare(rabbitMQSourceConfig.getQueueName(),
-                                     rabbitMQSourceConfig.isDurable(),
-                                     rabbitMQSourceConfig.isExclusive(),
-                                     rabbitMQSourceConfig.isAutoDelete(),
-                                     null
+            queueDeclaration = rabbitMQChannel.queueDeclare(rabbitMQSourceConfig.getQueueName(),
+                                                        rabbitMQSourceConfig.isDurable(),
+                                                        rabbitMQSourceConfig.isExclusive(),
+                                                        rabbitMQSourceConfig.isAutoDelete(),
+                                                        null
             );
         }
         logger.info("Setting channel.basicQos({}, {}).",
@@ -82,7 +83,7 @@ public class RabbitMQSource extends PushSource<byte[]> {
         rabbitMQChannel.basicQos(rabbitMQSourceConfig.getPrefetchCount(), rabbitMQSourceConfig.isPrefetchGlobal());
         com.rabbitmq.client.Consumer consumer = new RabbitMQConsumer(this, rabbitMQChannel);
         rabbitMQChannel.basicConsume(rabbitMQSourceConfig.getQueueName(), consumer);
-        logger.info("A consumer for queue {} has been successfully started.", rabbitMQSourceConfig.getQueueName());
+        logger.info("A consumer for queue {} has been successfully started.", queueDeclaration.getQueue());
     }
 
     @Override
