@@ -63,6 +63,24 @@ public class RabbitMQSourceConfig extends RabbitMQAbstractConfig implements Seri
             help = "Set true if the queue should be declared passively - ie to preserve durability/timeout settings")
     private boolean passive = false;
 
+    @FieldDoc(
+            required = false,
+            defaultValue = "false",
+            help = "Set true if the queue should survive a broker restart")
+    private boolean durable = false;
+
+    @FieldDoc(
+            required = false,
+            defaultValue = "false",
+            help = "Set true if the queue can be used by only one connection and get deleted when it closes")
+    private boolean exclusive = false;
+
+    @FieldDoc(
+            required = false,
+            defaultValue = "false",
+            help = "Set true if the queue should get deleted when the last consumer unsubscribes")
+    private boolean autoDelete = false;
+
     public static RabbitMQSourceConfig load(String yamlFile) throws IOException {
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
         return mapper.readValue(new File(yamlFile), RabbitMQSourceConfig.class);
