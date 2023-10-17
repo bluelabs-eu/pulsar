@@ -22,6 +22,8 @@ package org.apache.pulsar.io.rabbitmq;
 import com.google.common.base.Preconditions;
 import com.rabbitmq.client.ConnectionFactory;
 import java.io.Serializable;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
 import lombok.Data;
 import lombok.experimental.Accessors;
 import org.apache.pulsar.io.core.annotations.FieldDoc;
@@ -52,6 +54,12 @@ public class RabbitMQAbstractConfig implements Serializable {
         defaultValue = "5672",
         help = "The RabbitMQ port to connect to")
     private int port = 5672;
+
+    @FieldDoc(
+        required = false,
+        defaultValue = "false",
+        help = "Set to true to establish a secure connection to RabbitMQ")
+    private boolean ssl = false;
 
     @FieldDoc(
         required = true,
@@ -116,7 +124,7 @@ public class RabbitMQAbstractConfig implements Serializable {
         Preconditions.checkNotNull(connectionName, "connectionName property not set.");
     }
 
-    public ConnectionFactory createConnectionFactory() {
+    public ConnectionFactory createConnectionFactory() throws NoSuchAlgorithmException, KeyManagementException {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost(this.host);
         connectionFactory.setUsername(this.username);
@@ -128,6 +136,9 @@ public class RabbitMQAbstractConfig implements Serializable {
         connectionFactory.setHandshakeTimeout(this.handshakeTimeout);
         connectionFactory.setRequestedHeartbeat(this.requestedHeartbeat);
         connectionFactory.setPort(this.port);
+        if (this.ssl) {
+            connectionFactory.useSslProtocol();
+        }
         return connectionFactory;
     }
 }
