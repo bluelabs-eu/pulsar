@@ -25,6 +25,7 @@ import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import lombok.Data;
@@ -51,6 +52,7 @@ public class RabbitMQSource extends PushSource<byte[]> {
     private Connection rabbitMQConnection;
     private Channel rabbitMQChannel;
     private RabbitMQSourceConfig rabbitMQSourceConfig;
+    private String queueName;
 
     @Override
     public void open(Map<String, Object> config, SourceContext sourceContext) throws Exception {
@@ -75,6 +77,7 @@ public class RabbitMQSource extends PushSource<byte[]> {
                                                         null
             );
         }
+        queueName = queueDeclaration.getQueue();
         logger.info("Setting channel.basicQos({}, {}).",
                 rabbitMQSourceConfig.getPrefetchCount(),
                 rabbitMQSourceConfig.isPrefetchGlobal()
@@ -83,11 +86,11 @@ public class RabbitMQSource extends PushSource<byte[]> {
         String exchange = rabbitMQSourceConfig.getExchangeName();
         String routingKey = rabbitMQSourceConfig.getRoutingKey();
         if (exchange != null) {
-            rabbitMQChannel.queueBind(queueDeclaration.getQueue(), exchange, routingKey);
+            rabbitMQChannel.queueBind(queueName, exchange, routingKey);
         }
         com.rabbitmq.client.Consumer consumer = new RabbitMQConsumer(this, rabbitMQChannel);
         rabbitMQChannel.basicConsume(rabbitMQSourceConfig.getQueueName(), consumer);
-        logger.info("A consumer for queue {} has been successfully started.", queueDeclaration.getQueue());
+        logger.info("A consumer for queue {} has been successfully started.", queueName);
     }
 
     @Override
@@ -108,11 +111,15 @@ public class RabbitMQSource extends PushSource<byte[]> {
         public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body)
                 throws IOException {
             long deliveryTag = envelope.getDeliveryTag();
+            HashMap<String, String> pulsarProperties = new HashMap<String, String>();
+            pulsarProperties.put("consumerTag", consumerTag);
+            pulsarProperties.put("queueName", queueName);
             RabbitMQRecord record = new RabbitMQRecord(
                                                    Optional.ofNullable(envelope.getRoutingKey()),
                                                    body,
                                                    this.getChannel(),
-                                                   deliveryTag
+                                                   deliveryTag,
+                                                   pulsarProperties
             );
             source.consume(record);
         }
@@ -124,6 +131,7 @@ public class RabbitMQSource extends PushSource<byte[]> {
         private final byte[] value;
         private final Channel channel;
         private final Long deliveryTag;
+        private final Map<String, String> properties;
 
         public void ack() {
             try {
