@@ -81,6 +81,11 @@ public class RabbitMQSource extends PushSource<byte[]> {
                 rabbitMQSourceConfig.isPrefetchGlobal()
         );
         rabbitMQChannel.basicQos(rabbitMQSourceConfig.getPrefetchCount(), rabbitMQSourceConfig.isPrefetchGlobal());
+        String exchange = rabbitMQSourceConfig.getExchangeName();
+        String routingKey = rabbitMQSourceConfig.getRoutingKey();
+        if (exchange != null) {
+            rabbitMQChannel.queueBind(queueDeclaration.getQueue(), exchange, routingKey);
+        }
         com.rabbitmq.client.Consumer consumer = new RabbitMQConsumer(this, rabbitMQChannel);
         rabbitMQChannel.basicConsume(rabbitMQSourceConfig.getQueueName(), consumer);
         logger.info("A consumer for queue {} has been successfully started.", queueDeclaration.getQueue());
