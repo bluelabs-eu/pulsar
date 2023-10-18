@@ -89,7 +89,7 @@ public class RabbitMQSource extends PushSource<byte[]> {
             rabbitMQChannel.queueBind(queueName, exchange, routingKey);
         }
         com.rabbitmq.client.Consumer consumer = new RabbitMQConsumer(this, rabbitMQChannel);
-        rabbitMQChannel.basicConsume(rabbitMQSourceConfig.getQueueName(), consumer);
+        rabbitMQChannel.basicConsume(queueName, consumer);
         logger.info("A consumer for queue {} has been successfully started.", queueName);
     }
 
