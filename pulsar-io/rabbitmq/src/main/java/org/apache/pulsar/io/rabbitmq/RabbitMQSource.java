@@ -25,6 +25,7 @@ import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import lombok.Data;
@@ -51,6 +52,7 @@ public class RabbitMQSource extends PushSource<byte[]> {
     private Connection rabbitMQConnection;
     private Channel rabbitMQChannel;
     private RabbitMQSourceConfig rabbitMQSourceConfig;
+    private String queueName;
 
     @Override
     public void open(Map<String, Object> config, SourceContext sourceContext) throws Exception {
@@ -64,19 +66,31 @@ public class RabbitMQSource extends PushSource<byte[]> {
                 rabbitMQConnection.getPort()
         );
         rabbitMQChannel = rabbitMQConnection.createChannel();
+        AMQP.Queue.DeclareOk queueDeclaration;
         if (rabbitMQSourceConfig.isPassive()) {
-            rabbitMQChannel.queueDeclarePassive(rabbitMQSourceConfig.getQueueName());
+            queueDeclaration = rabbitMQChannel.queueDeclarePassive(rabbitMQSourceConfig.getQueueName());
         } else {
-            rabbitMQChannel.queueDeclare(rabbitMQSourceConfig.getQueueName(), false, false, false, null);
+            queueDeclaration = rabbitMQChannel.queueDeclare(rabbitMQSourceConfig.getQueueName(),
+                                                        rabbitMQSourceConfig.isDurable(),
+                                                        rabbitMQSourceConfig.isExclusive(),
+                                                        rabbitMQSourceConfig.isAutoDelete(),
+                                                        null
+            );
         }
+        queueName = queueDeclaration.getQueue();
         logger.info("Setting channel.basicQos({}, {}).",
                 rabbitMQSourceConfig.getPrefetchCount(),
                 rabbitMQSourceConfig.isPrefetchGlobal()
         );
         rabbitMQChannel.basicQos(rabbitMQSourceConfig.getPrefetchCount(), rabbitMQSourceConfig.isPrefetchGlobal());
+        String exchange = rabbitMQSourceConfig.getExchangeName();
+        String routingKey = rabbitMQSourceConfig.getRoutingKey();
+        if (exchange != null) {
+            rabbitMQChannel.queueBind(queueName, exchange, routingKey);
+        }
         com.rabbitmq.client.Consumer consumer = new RabbitMQConsumer(this, rabbitMQChannel);
-        rabbitMQChannel.basicConsume(rabbitMQSourceConfig.getQueueName(), consumer);
-        logger.info("A consumer for queue {} has been successfully started.", rabbitMQSourceConfig.getQueueName());
+        rabbitMQChannel.basicConsume(queueName, consumer);
+        logger.info("A consumer for queue {} has been successfully started.", queueName);
     }
 
     @Override
@@ -96,11 +110,18 @@ public class RabbitMQSource extends PushSource<byte[]> {
         @Override
         public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body)
                 throws IOException {
-            source.consume(new RabbitMQRecord(Optional.ofNullable(envelope.getRoutingKey()), body));
             long deliveryTag = envelope.getDeliveryTag();
-            // positively acknowledge all deliveries up to this delivery tag to reduce network traffic
-            // since manual message acknowledgments are turned on by default
-            this.getChannel().basicAck(deliveryTag, true);
+            HashMap<String, String> pulsarProperties = new HashMap<String, String>();
+            pulsarProperties.put("consumerTag", consumerTag);
+            pulsarProperties.put("queueName", queueName);
+            RabbitMQRecord record = new RabbitMQRecord(
+                                                   Optional.ofNullable(envelope.getRoutingKey()),
+                                                   body,
+                                                   this.getChannel(),
+                                                   deliveryTag,
+                                                   pulsarProperties
+            );
+            source.consume(record);
         }
     }
 
@@ -108,5 +129,25 @@ public class RabbitMQSource extends PushSource<byte[]> {
     private static class RabbitMQRecord implements Record<byte[]> {
         private final Optional<String> key;
         private final byte[] value;
+        private final Channel channel;
+        private final Long deliveryTag;
+        private final Map<String, String> properties;
+
+        public void ack() {
+            try {
+                channel.basicAck(deliveryTag, true);
+            } catch (IOException e) {
+                logger.error("Failed to acknowledge message.", e);
+            }
+        }
+
+        public void fail() {
+            try {
+                channel.basicNack(deliveryTag, true, true);
+            } catch (IOException e) {
+                logger.error("Failed to negatively acknowledge message.", e);
+            }
+        }
+
     }
 }

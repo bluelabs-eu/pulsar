@@ -1,0 +1,45 @@
+name: Main Pipeline
+
+on:
+  push:
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 11
+          cache: maven
+
+      - name: Test
+        run: mvn test -am -pl pulsar-io/rabbitmq
+
+  build:
+    if: contains(github.ref, 'refs/tags/')
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 11
+          cache: maven
+
+      - name: Build
+        run: mvn clean package -am -pl pulsar-io/rabbitmq -DskipTests
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          if-no-files-found: error
+          name: pulsar-io-rabbitmq-3.3.3-SNAPSHOT-${{ github.ref_name }}
+          path: pulsar-io/rabbitmq/target/pulsar-io-rabbitmq-3.3.3-SNAPSHOT.nar

@@ -44,6 +44,7 @@ public class RabbitMQSourceConfigTest {
         assertNotNull(config);
         assertEquals("localhost", config.getHost());
         assertEquals(Integer.parseInt("5672"), config.getPort());
+        assertEquals(false, config.isSsl());
         assertEquals("/", config.getVirtualHost());
         assertEquals("guest", config.getUsername());
         assertEquals("guest", config.getPassword());
@@ -64,6 +65,7 @@ public class RabbitMQSourceConfigTest {
         Map<String, Object> map = new HashMap<>();
         map.put("host", "localhost");
         map.put("port", "5672");
+        map.put("ssl", "false");
         map.put("virtualHost", "/");
         map.put("username", "guest");
         map.put("password", "guest");
@@ -125,6 +127,7 @@ public class RabbitMQSourceConfigTest {
         assertNotNull(config);
         assertEquals("localhost", config.getHost());
         assertEquals(Integer.parseInt("5672"), config.getPort());
+        assertEquals(false, config.isSsl());
         assertEquals("/", config.getVirtualHost());
         assertEquals("guest", config.getUsername());
         assertEquals("guest", config.getPassword());

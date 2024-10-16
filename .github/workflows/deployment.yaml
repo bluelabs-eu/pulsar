@@ -1,0 +1,81 @@
+name: deployment
+run-name: "${{ inputs.environment }} (${{ inputs.pulsarctl-action }})  | ${{ github.ref_name }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'environment'
+        required: true
+        type: choice
+        options:
+        - 'Betfox Staging'
+        - 'Bluepepper Staging'
+        - 'Rivalo Staging'
+        - 'United Staging'
+        - 'Betfox Production'
+        - 'Bluepepper Production'
+        - 'Rivalo Production'
+        - 'United Production'
+        default: 'Betfox Staging'
+      pulsar-admin-action:
+        description: 'pulsar-admin action'
+        required: true
+        type: choice
+        options:
+        - update
+        - create
+        - delete
+        - get
+        default: get
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      PULSAR_ADMIN_SERVICE_URL: ${{ vars.PULSAR_ADMIN_SERVICE_URL }}
+      PULSAR_ISSUER_URL: "https://auth.streamnative.cloud/"
+      PULSAR_ORG: ${{ vars.PULSAR_ORG }}
+      PULSAR_INSTANCE: ${{ vars.PULSAR_INSTANCE }}
+      PULSAR_OAUTH_KEY_FILE: "pulsar-oauth.key"
+      PULSAR_TENANT: ${{ vars.PULSAR_TENANT }}
+      PULSAR_NAMESPACE: "offer"
+      BL_OPERATOR: ${{ vars.BL_OPERATOR }}
+      PULSAR_SOURCE_NAME: "betradar-rabbitmq"
+      PULSAR_SOURCE_PARALLELISM: "1"
+      PULSAR_ADMIN_ACTION: ${{ inputs.pulsar-admin-action }}
+      BETRADAR_AMQP_HOST: ${{ vars.BETRADAR_AMQP_HOST }}
+      BETRADAR_AMQP_VIRTUAL_HOST: ${{ vars.BETRADAR_AMQP_VIRTUAL_HOST }}
+      BETRADAR_AMQP_CONNECTION_NAME: ${{ vars.BETRADAR_AMQP_CONNECTION_NAME }}
+      BETRADAR_AMQP_USERNAME: ${{ secrets.BETRADAR_AMQP_USERNAME }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 11
+          cache: maven
+
+      - name: Build
+        run: |
+          mvn clean package -am -pl pulsar-io/rabbitmq -DskipTests
+          mv ./pulsar-io/rabbitmq/target/pulsar-io-rabbitmq-3.3.3-SNAPSHOT.nar ${HOME}/pulsar-io-rabbitmq-3.3.3.nar
+
+      - name: Download oauth key file
+        run: |
+          echo '${{ secrets.CLIENT_SA_OAUTH_KEY }}' >> ${HOME}/${{ env.PULSAR_OAUTH_KEY_FILE }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy pulsar source
+        run: |
+          ./.github/workflows/deploy-pulsar-source.sh

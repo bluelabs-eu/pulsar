@@ -47,6 +47,7 @@ nb-configuration.xml
 log/
 target/
 .mvn/wrapper/maven-wrapper.jar
+.m2
 
 # Python
 *.pyc
@@ -99,3 +100,7 @@ test-reports/
 .mvn/.gradle-enterprise/
 # Gradle Develocity
 .mvn/.develocity/
+
+# Emacs
+*~
+*#
