@@ -198,10 +198,10 @@ flexible messaging model and an intuitive client API.</description>
     <mariadb-jdbc.version>2.7.5</mariadb-jdbc.version>
     <openmldb-jdbc.version>0.4.4-hotfix1</openmldb-jdbc.version>
     <json-smart.version>2.5.2</json-smart.version>
-    <opensearch.version>2.16.0</opensearch.version>
+    <opensearch.version>8.12.1</opensearch.version>
     <elasticsearch-java.version>8.12.1</elasticsearch-java.version>
-    <debezium.version>1.9.7.Final</debezium.version>
-    <debezium.postgresql.version>42.5.5</debezium.postgresql.version>
+    <debezium.version>3.1.0.Final</debezium.version>
+    <debezium.postgresql.version>42.6.1</debezium.postgresql.version>
     <debezium.mysql.version>8.0.30</debezium.mysql.version>
     <!-- Override version that brings CVE-2022-3143 with debezium -->
     <wildfly-elytron.version>1.15.16.Final</wildfly-elytron.version>
