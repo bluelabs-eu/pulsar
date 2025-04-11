@@ -196,11 +196,12 @@ flexible messaging model and an intuitive client API.</description>
     <json-smart.version>2.5.2</json-smart.version>
     <opensearch.version>1.2.4</opensearch.version>
     <elasticsearch-java.version>8.12.1</elasticsearch-java.version>
-    <debezium.version>1.9.7.Final</debezium.version>
-    <debezium.postgresql.version>42.5.5</debezium.postgresql.version>
+    <presto.version>332</presto.version>
+    <scala.binary.version>2.13</scala.binary.version>
+    <scala-library.version>2.13.10</scala-library.version>
+    <debezium.version>3.1.0.Final</debezium.version>
+    <debezium.postgresql.version>42.6.1</debezium.postgresql.version>
     <debezium.mysql.version>8.0.30</debezium.mysql.version>
-    <!-- Override version that brings CVE-2022-3143 with debezium -->
-    <wildfly-elytron.version>1.15.16.Final</wildfly-elytron.version>
     <jsonwebtoken.version>0.11.1</jsonwebtoken.version>
     <opencensus.version>0.28.0</opencensus.version>
     <hadoop3.version>3.4.0</hadoop3.version>
