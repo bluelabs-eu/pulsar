@@ -4,11 +4,13 @@ ifndef NODOCKER
 SHELL := BASH_ENV=.rc /bin/bash --noprofile
 endif
 
+BUILD_TARGETS ?= pulsar-io/rabbitmq,pulsar-io/kafka-connect-adaptor,pulsar-io/debezium/core,pulsar-io/debezium/postgres
+
 all: build test
 
-build: ; mvn clean -pl pulsar-io/rabbitmq install -DskipTests
+build: ; mvn clean -pl $(BUILD_TARGETS) install -DskipTests
 
-test: ; mvn -pl pulsar-io/rabbitmq test
+test: ; mvn -pl $(BUILD_TARGETS) test
 
 clean:
 	mvn clean
