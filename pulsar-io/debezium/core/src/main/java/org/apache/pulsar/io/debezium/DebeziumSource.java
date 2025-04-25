@@ -95,7 +95,6 @@ public abstract class DebeziumSource extends KafkaConnectSource {
             config.put(PulsarDatabaseHistory.CLIENT_BUILDER.name(), pulsarClientBuilder);
         }
 
-        log.info("Debezium config: {}", config);
         super.open(config, sourceContext);
     }
 
