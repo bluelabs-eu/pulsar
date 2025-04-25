@@ -80,7 +80,9 @@ public class KafkaConnectSource extends AbstractKafkaConnectSource<KeyValue<byte
                 String prefix = "transforms." + transformName + ".";
                 String typeKey = prefix + "type";
                 Object classNameObj = config.get(typeKey);
-                if (classNameObj == null) continue;
+                if (classNameObj == null) {
+                    continue;
+                }
                 String className = classNameObj.toString();
                 try {
                     @SuppressWarnings("unchecked")
@@ -107,7 +109,9 @@ public class KafkaConnectSource extends AbstractKafkaConnectSource<KeyValue<byte
     private SourceRecord applyTransforms(SourceRecord record) {
         SourceRecord current = record;
         for (Transformation<SourceRecord> transform : transformations) {
-            if (current == null) break;
+            if (current == null) {
+                break;
+            }
             current = transform.apply(current);
         }
         return current;
