@@ -32,6 +32,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -169,7 +171,6 @@ public abstract class AbstractKafkaConnectSource<T> implements Source<T> {
                 flushFuture = new CompletableFuture<>();
                 List<SourceRecord> recordList = sourceTask.poll();
                 if (recordList == null || recordList.isEmpty()) {
-                    Thread.sleep(1000);
                     continue;
                 }
                 outstandingRecords.addAndGet(recordList.size());
@@ -177,7 +178,7 @@ public abstract class AbstractKafkaConnectSource<T> implements Source<T> {
             }
             if (currentBatch.hasNext()) {
                 AbstractKafkaSourceRecord<T> processRecord = processSourceRecord(currentBatch.next());
-                if (processRecord.isEmpty()) {
+                if (processRecord == null || processRecord.isEmpty()) {
                     outstandingRecords.decrementAndGet();
                     continue;
                 } else {
@@ -187,14 +188,24 @@ public abstract class AbstractKafkaConnectSource<T> implements Source<T> {
                 // there is no records any more, then waiting for the batch to complete writing
                 // to sink and the offsets are committed as well, then do next round read.
                 try {
-                    flushFuture.get();
+                    log.info("Waiting for flushFuture to complete (outstandingRecords = {})", outstandingRecords.get());
+                    flushFuture.get(60, TimeUnit.SECONDS);
+                } catch (TimeoutException ex) {
+                    log.warn("Timeout while waiting for flushFuture to complete (outstandingRecords = {}).",
+                             outstandingRecords.get());
+                    if (flushFuture != null && !flushFuture.isDone()) {
+                        log.warn("flushFuture is not completed yet, completing exceptionally due to timeout.");
+                        flushFuture.completeExceptionally(ex);
+                    }
                 } catch (ExecutionException ex) {
                     // log the error, continue execution
                     log.error("execution exception while get flushFuture", ex);
                     throw new Exception("Flush failed", ex.getCause());
                 } finally {
+                    log.info("Resetting flushFuture, currentBatch and outsdtandingRecords");
                     flushFuture = null;
                     currentBatch = null;
+                    outstandingRecords.set(0);
                 }
             }
         }
@@ -298,6 +309,8 @@ public abstract class AbstractKafkaConnectSource<T> implements Source<T> {
 
             // consumed all the records, flush the offsets
             if (canFlush && flushFuture != null) {
+                log.info("All records acked, starting flush... (outstandingRecords = 0)");
+
                 if (!offsetWriter.beginFlush()) {
                     log.error("When beginFlush, No offsets to commit!");
                     flushFuture.completeExceptionally(new Exception("No Offsets Added Error when beginFlush"));
@@ -311,11 +324,15 @@ public abstract class AbstractKafkaConnectSource<T> implements Source<T> {
                     flushFuture.completeExceptionally(new Exception("No Offsets Added Error"));
                     return;
                 }
+
+                log.info("doFlush started successfully, waiting for flush to complete...");
             }
         }
 
         @Override
         public void fail() {
+            outstandingRecords.decrementAndGet();
+            log.warn("Record processing failed, marking fail: outstandingRecords={}", outstandingRecords.get());
             if (flushFuture != null) {
                 flushFuture.completeExceptionally(new Exception("Sink Error"));
             }
