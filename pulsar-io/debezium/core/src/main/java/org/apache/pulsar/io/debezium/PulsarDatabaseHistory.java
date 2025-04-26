@@ -26,12 +26,12 @@ import io.debezium.annotation.ThreadSafe;
 import io.debezium.config.Configuration;
 import io.debezium.config.Field;
 import io.debezium.document.DocumentReader;
-import io.debezium.relational.history.AbstractSchemaHistory;
+import io.debezium.relational.history.AbstractDatabaseHistory;
+import io.debezium.relational.history.DatabaseHistory;
+import io.debezium.relational.history.DatabaseHistoryException;
+import io.debezium.relational.history.DatabaseHistoryListener;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.HistoryRecordComparator;
-import io.debezium.relational.history.SchemaHistory;
-import io.debezium.relational.history.SchemaHistoryException;
-import io.debezium.relational.history.SchemaHistoryListener;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -51,12 +51,12 @@ import org.apache.pulsar.client.api.Reader;
 import org.apache.pulsar.client.api.Schema;
 
 /**
- * A {@link SchemaHistory} implementation that records schema changes as normal pulsar messages on the specified
+ * A {@link DatabaseHistory} implementation that records schema changes as normal pulsar messages on the specified
  * topic, and that recovers the history by establishing a Kafka Consumer re-processing all messages on that topic.
  */
 @Slf4j
 @ThreadSafe
-public final class PulsarDatabaseHistory extends AbstractSchemaHistory {
+public final class PulsarDatabaseHistory extends AbstractDatabaseHistory {
 
     public static final Field TOPIC = Field.create(CONFIGURATION_FIELD_PREFIX_STRING + "pulsar.topic")
         .withDisplayName("Database history topic name")
@@ -96,7 +96,7 @@ public final class PulsarDatabaseHistory extends AbstractSchemaHistory {
         TOPIC,
         SERVICE_URL,
         CLIENT_BUILDER,
-        AbstractSchemaHistory.NAME,
+        DatabaseHistory.NAME,
         READER_CONFIG);
 
     private final DocumentReader reader = DocumentReader.defaultReader();
@@ -111,10 +111,10 @@ public final class PulsarDatabaseHistory extends AbstractSchemaHistory {
     public void configure(
             Configuration config,
             HistoryRecordComparator comparator,
-            SchemaHistoryListener listener,
+            DatabaseHistoryListener listener,
             boolean useCatalogBeforeSchema) {
         super.configure(config, comparator, listener, useCatalogBeforeSchema);
-        if (!config.validateAndRecord(ALL_FIELDS, log::error)) {
+        if (!config.validateAndRecord(ALL_FIELDS, logger::error)) {
             throw new IllegalArgumentException("Error configuring an instance of "
                 + getClass().getSimpleName() + "; check the logs for details");
         }
@@ -140,7 +140,7 @@ public final class PulsarDatabaseHistory extends AbstractSchemaHistory {
         }
 
         // Copy the relevant portions of the configuration and add useful defaults ...
-        this.dbHistoryName = config.getString(SchemaHistory.NAME, UUID.randomUUID().toString());
+        this.dbHistoryName = config.getString(DatabaseHistory.NAME, UUID.randomUUID().toString());
 
         log.info("Configure to store the debezium database history {} to pulsar topic {}",
             dbHistoryName, topicName);
@@ -193,7 +193,7 @@ public final class PulsarDatabaseHistory extends AbstractSchemaHistory {
     }
 
     @Override
-    protected void storeRecord(HistoryRecord record) throws SchemaHistoryException {
+    protected void storeRecord(HistoryRecord record) throws DatabaseHistoryException {
         if (this.producer == null) {
             throw new IllegalStateException("No producer is available. Ensure that 'start()'"
                     + " is called before storing database history records.");
@@ -204,7 +204,7 @@ public final class PulsarDatabaseHistory extends AbstractSchemaHistory {
         try {
             producer.send(record.toString());
         } catch (PulsarClientException e) {
-            throw new SchemaHistoryException(e);
+            throw new DatabaseHistoryException(e);
         }
     }
 
