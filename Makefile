@@ -8,7 +8,7 @@ BUILD_TARGETS ?= pulsar-io/rabbitmq,pulsar-io/kafka-connect-adaptor,pulsar-io/de
 
 all: build test
 
-build: ; mvn clean -pl $(BUILD_TARGETS) install -DskipTests
+build: ; mvn clean -pl $(BUILD_TARGETS) install -DskipTests -Dspotbugs.skip=true -Dlicense.skip=true -Dcheckstyle.skip=true -am
 
 test: ; mvn -pl $(BUILD_TARGETS) test
 
