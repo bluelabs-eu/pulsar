@@ -42,15 +42,16 @@ public class DebeziumMongoDbSourceTester extends SourceTester<DebeziumMongoDbCon
         this.pulsarCluster = cluster;
         pulsarServiceUrl = "pulsar://pulsar-proxy:" + PulsarContainer.BROKER_PORT;
 
-        sourceConfig.put("mongodb.hosts", "rs0/" + DebeziumMongoDbContainer.NAME + ":27017");
-        sourceConfig.put("mongodb.name", "dbserver1");
+        sourceConfig.put("mongodb.connection.string", "mongodb://debezium:dbz@" + DebeziumMongoDbContainer.NAME + ":27017/admin?replicaSet=rs0");
         sourceConfig.put("mongodb.user", "debezium");
         sourceConfig.put("mongodb.password", "dbz");
         sourceConfig.put("mongodb.task.id","1");
+        sourceConfig.put("topic.prefix", "dbserver1");
         sourceConfig.put("database.include.list", "inventory");
-        sourceConfig.put("database.history.pulsar.service.url", pulsarServiceUrl);
+        sourceConfig.put("schema.history.internal.pulsar.service.url", pulsarServiceUrl);
         sourceConfig.put("topic.namespace", "debezium/mongodb");
-        sourceConfig.put("capture.mode", "oplog");
+        sourceConfig.put("capture.mode", "change_streams_update_full");
+        sourceConfig.put("connector.class", "io.debezium.connector.mongodb.MongoDbConnector");
     }
 
     @Override
